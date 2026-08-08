@@ -1,0 +1,497 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  BUYER
+  SUPPLIER
+  ADMIN
+}
+
+enum SupplierStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum SupplierType {
+  MANUFACTURER
+  TRADER
+  WHOLESALER
+}
+
+enum FabricStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum SampleOrderStatus {
+  PAYMENT_PENDING
+  PAYMENT_VERIFICATION
+  CONFIRMED
+  SUPPLIER_PREPARING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFICATION_PENDING
+  VERIFIED
+  REJECTED
+  REFUNDED
+}
+
+enum RfqStatus {
+  REQUESTED
+  SUPPLIER_REVIEWING
+  NEGOTIATING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  ORDER_CREATED
+}
+
+enum OfferStatus {
+  ACTIVE
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum BulkOrderStatus {
+  QUOTE_ACCEPTED
+  AWAITING_PAYMENT
+  PAYMENT_VERIFICATION
+  PAID
+  PROCESSING
+  READY_TO_SHIP
+  SHIPPED
+  DELIVERED
+  INSPECTION_PERIOD
+  COMPLETED
+  CANCELLED
+  DISPUTED
+  RETURN_REQUESTED
+  RETURN_APPROVED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_BUYER
+  RESOLVED_SUPPLIER
+  CLOSED
+}
+
+enum ReviewType {
+  SAMPLE
+  BULK
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String
+  role         Role            @default(BUYER)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  buyerProfile BuyerProfile?
+  supplierProfile SupplierProfile?
+  notifications Notification[]
+}
+
+model BuyerProfile {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  contactName  String
+  businessType String
+  location     String
+  address      String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  sampleOrders SampleOrder[]
+  rfqs         RFQ[]
+  bulkOrders   BulkOrder[]
+  savedFabrics SavedFabric[]
+  savedSuppliers SavedSupplier[]
+}
+
+model SupplierProfile {
+  id                 String              @id @default(uuid())
+  userId             String              @unique
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName       String
+  contactName        String
+  businessType       String
+  location           String
+  address            String
+  description        String
+  supplierType       SupplierType
+  gstin              String?
+  pan                String?
+  catalogueProofUrl  String?
+  logoUrl            String?
+  status             SupplierStatus      @default(PENDING)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  fabrics            Fabric[]
+  catalogues         Catalogue[]
+  sampleOrders       SampleOrder[]
+  rfqs               RFQ[]
+  bulkOrders         BulkOrder[]
+  savedBy            SavedSupplier[]
+  commissionRate     Decimal             @default(0.02) @db.Decimal(5, 4)
+}
+
+model Category {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  fabrics   Fabric[]
+  createdAt DateTime @default(now())
+}
+
+model Fabric {
+  id             String               @id @default(uuid())
+  fabricId       String               @unique // STF-XXXXXX format
+  name           String
+  slug           String               @unique
+  description    String
+  price          Decimal              @db.Decimal(10, 2)
+  unit           String               @default("metre")
+  moq            Int                  @default(100)
+  gsm            Int
+  width          Int                  @default(44) // in inches
+  composition    String
+  material       String
+  stretch        String               @default("Non-stretch")
+  finish         String               @default("Regular")
+  pattern        String               @default("Solid")
+  colors         String[]             // e.g., ["Black", "White", "Navy"]
+  useCases       String[]             // e.g., ["Garments", "Digital printing"]
+  productionTime Int                  @default(15) // days
+  sampleAvailable Boolean             @default(true)
+  status         FabricStatus         @default(PENDING_APPROVAL)
+  supplierId     String
+  supplier       SupplierProfile      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category             @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images         FabricImage[]
+  sampleOptions  FabricSampleOption[]
+  catalogues     CatalogueFabric[]
+  savedBy        SavedFabric[]
+  sampleOrders   SampleOrder[]
+  rfqs           RFQ[]
+  bulkOrders     BulkOrder[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([fabricId])
+  @@index([status])
+}
+
+model FabricImage {
+  id        String   @id @default(uuid())
+  fabricId  String
+  fabric    Fabric   @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+}
+
+model FabricSampleOption {
+  id          String   @id @default(uuid())
+  fabricId    String
+  fabric      Fabric   @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+  name        String   // e.g. 1 Metre, Swatch
+  description String?
+  size        String   // e.g. 100cm x 110cm
+  price       Decimal  @db.Decimal(10, 2)
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Catalogue {
+  id          String            @id @default(uuid())
+  name        String
+  slug        String            @unique
+  coverImage  String?
+  description String?
+  isPublic    Boolean           @default(true)
+  supplierId  String
+  supplier    SupplierProfile   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  fabrics     CatalogueFabric[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model CatalogueFabric {
+  catalogueId String
+  catalogue   Catalogue @relation(fields: [catalogueId], references: [id], onDelete: Cascade)
+  fabricId    String
+  fabric      Fabric    @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+
+  @@id([catalogueId, fabricId])
+}
+
+model SavedFabric {
+  id        String       @id @default(uuid())
+  buyerId   String
+  buyer     BuyerProfile @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  fabricId  String
+  fabric    Fabric       @relation(fields: [fabricId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([buyerId, fabricId])
+}
+
+model SavedSupplier {
+  id         String          @id @default(uuid())
+  buyerId    String
+  buyer      BuyerProfile    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  supplierId String
+  supplier   SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  createdAt  DateTime        @default(now())
+
+  @@unique([buyerId, supplierId])
+}
+
+model SampleOrder {
+  id                    String            @id // SO-XXXXXX format
+  buyerId               String
+  buyer                 BuyerProfile      @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  supplierId            String
+  supplier              SupplierProfile   @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  fabricId              String
+  fabric                Fabric            @relation(fields: [fabricId], references: [id], onDelete: Restrict)
+  sampleOptionId        String
+  quantity              Int               @default(1)
+  samplePrice           Decimal           @db.Decimal(10, 2)
+  shippingPrice         Decimal           @db.Decimal(10, 2)
+  totalPrice            Decimal           @db.Decimal(10, 2)
+  shippingAddressName   String
+  shippingAddressLine1  String
+  shippingAddressLine2  String?
+  shippingAddressCity   String
+  shippingAddressState  String
+  shippingAddressZip    String
+  shippingAddressPhone  String
+  status                SampleOrderStatus @default(PAYMENT_PENDING)
+  utr                   String?
+  paymentScreenshotUrl  String?
+  paymentStatus         PaymentStatus     @default(PENDING)
+  paymentVerifiedAt     DateTime?
+  paymentVerifiedBy     String?           // Admin User ID
+  paymentAuditNote      String?
+  courierName           String?
+  trackingId            String?
+  trackingUrl           String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  reviews               Review[]
+
+  @@index([buyerId])
+  @@index([supplierId])
+}
+
+model RFQ {
+  id                   String        @id // RFQ-XXXXXX format
+  buyerId              String
+  buyer                BuyerProfile  @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  supplierId           String
+  supplier             SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  fabricId             String
+  fabric               Fabric        @relation(fields: [fabricId], references: [id], onDelete: Restrict)
+  quantity             Int
+  unit                 String        @default("metre")
+  color                String
+  requiredDeliveryDate DateTime
+  deliveryLocation     String
+  targetPrice          Decimal       @db.Decimal(10, 2)
+  requirements         String?
+  status               RfqStatus     @default(REQUESTED)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  negotiation          Negotiation?
+  bulkOrders           BulkOrder[]
+
+  @@index([buyerId])
+  @@index([supplierId])
+}
+
+model Negotiation {
+  id         String      @id @default(uuid())
+  rfqId      String      @unique
+  rfq        RFQ         @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+  buyerId    String
+  supplierId String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  messages   Message[]
+  offers     Offer[]
+}
+
+model Message {
+  id            String      @id @default(uuid())
+  negotiationId String
+  negotiation   Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  senderRole    Role
+  text          String
+  createdAt     DateTime    @default(now())
+}
+
+model Offer {
+  id             String      @id // OFFER-XXXXXX format
+  rfqId          String
+  negotiationId  String
+  negotiation    Negotiation @relation(fields: [negotiationId], references: [id], onDelete: Cascade)
+  createdBy      Role
+  pricePerMetre  Decimal     @db.Decimal(10, 2)
+  quantity       Int
+  subtotal       Decimal     @db.Decimal(10, 2)
+  shippingCharge Decimal     @db.Decimal(10, 2)
+  otherCharges   Decimal     @db.Decimal(10, 2) @default(0)
+  total          Decimal     @db.Decimal(10, 2)
+  productionDays Int
+  offerValidity  DateTime
+  notes          String?
+  status         OfferStatus @default(ACTIVE)
+  createdAt      DateTime    @default(now())
+  bulkOrders     BulkOrder[]
+}
+
+model BulkOrder {
+  id                    String          @id // B-XXXXXX format
+  buyerId               String
+  buyer                 BuyerProfile    @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  supplierId            String
+  supplier              SupplierProfile @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  fabricId              String
+  fabric                Fabric          @relation(fields: [fabricId], references: [id], onDelete: Restrict)
+  fabricNameSnapshot    String
+  fabricIdSnapshot      String
+  fabricDescSnapshot    String?
+  quantity              Int
+  unit                  String          @default("metre")
+  pricePerUnit          Decimal         @db.Decimal(10, 2)
+  subtotal              Decimal         @db.Decimal(10, 2)
+  shipping              Decimal         @db.Decimal(10, 2)
+  total                 Decimal         @db.Decimal(10, 2)
+  productionTime        Int             // days
+  offerId               String
+  offer                 Offer           @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  rfqId                 String
+  rfq                   RFQ             @relation(fields: [rfqId], references: [id], onDelete: Restrict)
+  status                BulkOrderStatus @default(QUOTE_ACCEPTED)
+  shippingAddressName   String
+  shippingAddressLine1  String
+  shippingAddressLine2  String?
+  shippingAddressCity   String
+  shippingAddressState  String
+  shippingAddressZip    String
+  shippingAddressPhone  String
+  utr                   String?
+  paymentScreenshotUrl  String?
+  paymentStatus         PaymentStatus   @default(PENDING)
+  paymentVerifiedAt     DateTime?
+  paymentVerifiedBy     String?         // Admin User ID
+  paymentAuditNote      String?
+  courierName           String?
+  trackingId            String?
+  trackingUrl           String?
+  shippedAt             DateTime?
+  deliveredAt           DateTime?
+  inspectionEndsAt      DateTime?
+  commissionRate        Decimal         @db.Decimal(5, 4)
+  commissionAmount      Decimal         @db.Decimal(10, 2)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  disputes              Dispute[]
+  reviews               Review[]
+
+  @@index([buyerId])
+  @@index([supplierId])
+}
+
+model Dispute {
+  id             String        @id // DISP-XXXXXX format
+  orderId        String
+  order          BulkOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  raisedBy       Role          @default(BUYER)
+  reason         String
+  description    String
+  evidenceImages String[]      // URLs
+  status         DisputeStatus @default(OPEN)
+  adminNotes     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model Review {
+  id                     String      @id @default(uuid())
+  type                   ReviewType
+  sampleOrderId          String?
+  sampleOrder            SampleOrder? @relation(fields: [sampleOrderId], references: [id], onDelete: Restrict)
+  bulkOrderId            String?
+  bulkOrder              BulkOrder?   @relation(fields: [bulkOrderId], references: [id], onDelete: Restrict)
+  buyerId                String
+  fabricId               String
+  supplierId             String
+  ratingFabricQuality    Int
+  ratingMatchesSample    Int
+  ratingDelivery         Int
+  ratingCommunication    Int
+  comment                String?
+  createdAt              DateTime    @default(now())
+
+  @@index([fabricId])
+  @@index([supplierId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  type      String   // e.g. PAYMENT_VERIFIED, COUNTEROFFER
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  oldState   String?
+  newState   String?
+  timestamp  DateTime @default(now())
+  metadata   Json?
+}
+
+model SystemSettings {
+  id                   String   @id @default("global")
+  globalCommissionRate Decimal  @default(0.02) @db.Decimal(5, 4)
+  upiId                 String   @default("pay@textile")
+  upiQrUrl              String?  @default("/images/default-qr.png")
+  bankInstructions      String   @default("Bank: State Bank of India\nAccount: 12345678901\nIFSC: SBIN0001234\nName: Surat Textile Sourcing Marketplace")
+}

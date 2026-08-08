@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, setAuthCookie } from "@/lib/auth";
 import { uploadFile } from "@/lib/upload";
 import { redirect } from "next/navigation";
+import bcrypt from "bcryptjs";
 
 function generateSampleOrderId() {
   const rand = Math.floor(100000 + Math.random() * 900000);
@@ -11,10 +12,8 @@ function generateSampleOrderId() {
 }
 
 export async function createSampleOrderAction(prevState: any, formData: FormData) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== "BUYER" || !currentUser.buyerProfile) {
-    return { error: "Unauthorized. Please log in as a buyer." };
-  }
+  let currentUser = await getCurrentUser();
+  let buyerProfileId = "";
 
   const fabricId = formData.get("fabricId") as string;
   const sampleOptionId = formData.get("sampleOptionId") as string;
@@ -31,6 +30,69 @@ export async function createSampleOrderAction(prevState: any, formData: FormData
 
   if (!fabricId || !sampleOptionId || !addressName || !addressLine1 || !addressCity || !addressState || !addressZip || !addressPhone) {
     return { error: "Please fill in all required delivery details." };
+  }
+
+  // Guest Details
+  const guestName = formData.get("guestName") as string;
+  const guestEmail = formData.get("guestEmail") as string;
+
+  if (!currentUser) {
+    if (!guestName || !guestEmail) {
+      return { error: "Please fill in your name and email for guest checkout." };
+    }
+
+    try {
+      const emailLower = guestEmail.toLowerCase();
+      // Check if email already exists
+      const existingUser = await db.user.findUnique({
+        where: { email: emailLower }
+      });
+      if (existingUser) {
+        return { error: "An account with this email already exists. Please sign in to place your order." };
+      }
+
+      // Automatically create buyer account
+      const defaultPasswordHash = await bcrypt.hash("guest123", 10);
+      const guestResult = await db.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: emailLower,
+            passwordHash: defaultPasswordHash,
+            role: "BUYER"
+          }
+        });
+
+        const newProfile = await tx.buyerProfile.create({
+          data: {
+            userId: newUser.id,
+            businessName: addressName || guestName,
+            contactName: guestName,
+            businessType: "B2B Guest Buyer",
+            location: `${addressCity}, ${addressState}`,
+            address: `${addressLine1} ${addressLine2 || ""}`.trim()
+          }
+        });
+
+        return { newUser, newProfile };
+      });
+
+      // Login the guest user immediately
+      await setAuthCookie({
+        userId: guestResult.newUser.id,
+        email: guestResult.newUser.email,
+        role: guestResult.newUser.role
+      });
+
+      buyerProfileId = guestResult.newProfile.id;
+    } catch (err) {
+      console.error("Guest registration error:", err);
+      return { error: "Failed to set up guest buyer profile. Please try again." };
+    }
+  } else {
+    if (currentUser.role !== "BUYER" || !currentUser.buyerProfile) {
+      return { error: "Unauthorized. Please log in as a buyer." };
+    }
+    buyerProfileId = currentUser.buyerProfile.id;
   }
 
   try {
@@ -59,7 +121,7 @@ export async function createSampleOrderAction(prevState: any, formData: FormData
     const order = await db.sampleOrder.create({
       data: {
         id: orderId,
-        buyerId: currentUser.buyerProfile.id,
+        buyerId: buyerProfileId,
         supplierId: fabric.supplierId,
         fabricId: fabric.id,
         sampleOptionId: option.id,
@@ -166,5 +228,39 @@ export async function submitSamplePaymentAction(prevState: any, formData: FormDa
   } catch (error) {
     console.error("Submit payment error:", error);
     return { error: "Failed to submit payment verification. Please try again." };
+  }
+}
+
+export async function activateGuestAccountAction(prevState: any, formData: FormData) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return { error: "Session expired. Please log in." };
+  }
+
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!password || !confirmPassword) {
+    return { error: "Please enter both password fields." };
+  }
+
+  if (password.length < 6) {
+    return { error: "Password must be at least 6 characters long." };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match." };
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    await db.user.update({
+      where: { id: currentUser.id },
+      data: { passwordHash }
+    });
+    return { success: true };
+  } catch (err) {
+    console.error("Activate password error:", err);
+    return { error: "Failed to update password. Please try again." };
   }
 }

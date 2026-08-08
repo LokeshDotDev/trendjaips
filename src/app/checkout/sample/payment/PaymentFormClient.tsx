@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useActionState, startTransition } from "react";
+import React, { useActionState, startTransition, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { submitSamplePaymentAction } from "../../actions";
+import { submitSamplePaymentAction, activateGuestAccountAction } from "../../actions";
 import { QrCode, Copy, CheckCircle2, ShieldCheck, AlertCircle } from "lucide-react";
 
 interface PaymentFormClientProps {
@@ -35,15 +35,19 @@ export default function PaymentFormClient({ order, settings }: PaymentFormClient
           <CheckCircle2 className="h-10 w-10" />
         </div>
         <div className="space-y-2">
-          <h3 className="text-xl font-bold text-slate-900">Verification Pending</h3>
-          <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
+          <h3 className="text-xl font-bold text-slate-900 font-serif">Verification Submitted</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed font-semibold">
             Your payment reference and screenshot have been uploaded. An administrator will verify the payment against our bank records shortly.
           </p>
         </div>
+
+        {/* Set password section for guest account setup */}
+        <SetPasswordForm />
+
         <div className="pt-4 border-t border-slate-100">
           <button
             onClick={() => router.push("/buyer/samples")}
-            className="w-full justify-center rounded-md bg-slate-900 py-3 text-sm font-bold text-white shadow-sm hover:bg-slate-800 transition-colors"
+            className="w-full justify-center rounded-md bg-slate-950 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#8c7457] transition-colors"
           >
             Go to My Samples
           </button>
@@ -194,5 +198,67 @@ export default function PaymentFormClient({ order, settings }: PaymentFormClient
         </button>
       </form>
     </div>
+  );
+}
+
+function SetPasswordForm() {
+  const [passwordState, passwordAction, isPasswordPending] = useActionState(activateGuestAccountAction, null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (passwordState?.success) {
+      setDone(true);
+    }
+  }, [passwordState]);
+
+  if (done) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 p-4 rounded-xl text-xs font-semibold max-w-sm mx-auto">
+        Password set successfully! You can now access your buyer panel in the future.
+      </div>
+    );
+  }
+
+  return (
+    <form action={passwordAction} className="border border-[#f0eae1] bg-[#faf8f5] p-5 rounded-xl text-left space-y-4 max-w-sm mx-auto mt-4">
+      <div>
+        <h4 className="text-xs font-bold text-slate-850">Secure Your Buyer Profile</h4>
+        <p className="text-[10px] text-slate-500 font-semibold mt-0.5">Please set a secure login password to track sample delivery and message suppliers.</p>
+      </div>
+
+      {passwordState?.error && (
+        <p className="text-[10px] text-red-650 font-bold">{passwordState.error}</p>
+      )}
+
+      <div className="space-y-3 text-xs">
+        <div>
+          <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">New Password</label>
+          <input
+            name="password"
+            type="password"
+            required
+            className="w-full border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none text-slate-900"
+            placeholder="Min 6 characters"
+          />
+        </div>
+        <div>
+          <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Confirm Password</label>
+          <input
+            name="confirmPassword"
+            type="password"
+            required
+            className="w-full border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none text-slate-900"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={isPasswordPending}
+        className="w-full bg-slate-950 hover:bg-[#8c7457] text-white py-2.5 rounded text-[10px] font-bold uppercase tracking-wider disabled:opacity-50 cursor-pointer"
+      >
+        {isPasswordPending ? "Updating Password..." : "Set Password"}
+      </button>
+    </form>
   );
 }

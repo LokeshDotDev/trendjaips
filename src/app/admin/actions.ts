@@ -398,3 +398,68 @@ export async function resolveDisputeAction(
     return { error: "Failed to resolve dispute." };
   }
 }
+
+export async function createCategoryAction(prevState: any, formData: FormData) {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "ADMIN") {
+    return { error: "Unauthorized." };
+  }
+
+  const name = formData.get("name") as string;
+  const parentId = formData.get("parentId") as string;
+  const description = formData.get("description") as string;
+  const image = formData.get("image") as string;
+  const displayOrderInput = formData.get("displayOrder") as string;
+  const isActiveInput = formData.get("isActive") as string;
+
+  if (!name) {
+    return { error: "Category name is required." };
+  }
+
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const displayOrder = parseInt(displayOrderInput) || 0;
+  const isActive = isActiveInput === "true";
+
+  try {
+    const category = await db.category.create({
+      data: {
+        name,
+        slug,
+        parentId: parentId || null,
+        description: description || null,
+        image: image || null,
+        displayOrder,
+        isActive,
+      },
+    });
+
+    revalidatePath("/admin/categories");
+    revalidatePath("/fabrics");
+    revalidatePath("/");
+    return { success: true, category };
+  } catch (err) {
+    console.error("Create category error:", err);
+    return { error: "Failed to create category. Ensure name is unique." };
+  }
+}
+
+export async function toggleCategoryActiveAction(categoryId: string, isActive: boolean) {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== "ADMIN") {
+    return { error: "Unauthorized." };
+  }
+
+  try {
+    await db.category.update({
+      where: { id: categoryId },
+      data: { isActive },
+    });
+    revalidatePath("/admin/categories");
+    revalidatePath("/fabrics");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err) {
+    console.error("Toggle active error:", err);
+    return { error: "Failed to update category status." };
+  }
+}

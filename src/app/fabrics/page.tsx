@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { Search, Filter, ShieldCheck, Grid, List, SlidersHorizontal, ArrowUpDown } from "lucide-react";
+import SortSelect from "./SortSelect";
 
 interface FabricsPageProps {
   searchParams: Promise<{
@@ -54,7 +55,12 @@ export default async function FabricsPage({ searchParams }: FabricsPageProps) {
   }
 
   if (categorySlug) {
-    where.category = { slug: categorySlug };
+    where.category = {
+      OR: [
+        { slug: categorySlug },
+        { parent: { slug: categorySlug } }
+      ]
+    };
   }
 
   if (supplierId) {
@@ -118,7 +124,11 @@ export default async function FabricsPage({ searchParams }: FabricsPageProps) {
     },
   });
 
-  const categories = await db.category.findMany();
+  const categories = await db.category.findMany({
+    where: { parentId: null, isActive: true },
+    include: { subcategories: { where: { isActive: true }, orderBy: { displayOrder: "asc" } } },
+    orderBy: { displayOrder: "asc" },
+  });
   
   // Static lists for filter dropdowns
   const locations = ["Surat", "Mumbai", "Ahmedabad", "Delhi", "Bangalore"];
@@ -183,13 +193,20 @@ export default async function FabricsPage({ searchParams }: FabricsPageProps) {
                 id="category"
                 name="category"
                 defaultValue={categorySlug}
-                className="w-full text-sm border border-slate-300 rounded px-2.5 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                className="w-full text-sm border border-slate-300 rounded px-2.5 py-2 text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#b39b7d] bg-white cursor-pointer"
               >
                 <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.slug}>
-                    {cat.name}
-                  </option>
+                {categories.map((parent) => (
+                  <React.Fragment key={parent.id}>
+                    <option value={parent.slug} className="font-bold text-slate-900 bg-slate-100">
+                      {parent.name}
+                    </option>
+                    {parent.subcategories.map((sub) => (
+                      <option key={sub.id} value={sub.slug}>
+                        &nbsp;&nbsp;— {sub.name}
+                      </option>
+                    ))}
+                  </React.Fragment>
                 ))}
               </select>
             </div>
@@ -325,36 +342,7 @@ export default async function FabricsPage({ searchParams }: FabricsPageProps) {
               {fabrics.length} Items Found
             </span>
 
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                <ArrowUpDown className="h-3 w-3" /> Sort By
-              </span>
-              <form action="/fabrics" method="GET" className="inline-block">
-                {search && <input type="hidden" name="search" value={search} />}
-                {categorySlug && <input type="hidden" name="category" value={categorySlug} />}
-                {params.minPrice && <input type="hidden" name="minPrice" value={params.minPrice} />}
-                {params.maxPrice && <input type="hidden" name="maxPrice" value={params.maxPrice} />}
-                {params.gsm && <input type="hidden" name="gsm" value={params.gsm} />}
-                {params.width && <input type="hidden" name="width" value={params.width} />}
-                {params.moq && <input type="hidden" name="moq" value={params.moq} />}
-                {useCase && <input type="hidden" name="useCase" value={useCase} />}
-                {supplierType && <input type="hidden" name="supplierType" value={supplierType} />}
-                {location && <input type="hidden" name="location" value={location} />}
-
-                <select
-                  name="sort"
-                  defaultValue={sort}
-                  onChange={(e) => e.target.form?.submit()}
-                  className="text-xs border border-slate-300 rounded px-2 py-1.5 text-slate-900 bg-white font-semibold focus:outline-none"
-                >
-                  <option value="recommended">Newest Listings</option>
-                  <option value="price-asc">Price: Low to High</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="moq-asc">MOQ: Low to High</option>
-                  <option value="gsm-desc">GSM: High to Low</option>
-                </select>
-              </form>
-            </div>
+            <SortSelect />
           </div>
 
           {fabrics.length === 0 ? (

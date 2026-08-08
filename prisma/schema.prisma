@@ -162,11 +162,19 @@ model SupplierProfile {
 }
 
 model Category {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  slug      String   @unique
-  fabrics   Fabric[]
-  createdAt DateTime @default(now())
+  id            String     @id @default(uuid())
+  name          String     @unique
+  slug          String     @unique
+  parentId      String?
+  parent        Category?  @relation("Subcategories", fields: [parentId], references: [id], onDelete: Cascade)
+  subcategories Category[] @relation("Subcategories")
+  description   String?
+  image         String?
+  displayOrder  Int        @default(0)
+  isActive      Boolean    @default(true)
+  fabrics       Fabric[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 model Fabric {

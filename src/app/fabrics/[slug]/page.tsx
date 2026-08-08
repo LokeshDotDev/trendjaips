@@ -151,19 +151,38 @@ export default async function FabricDetailPage({ params }: FabricDetailPageProps
               </div>
             </div>
 
+            {/* Sample Callout */}
+            {fabric.sampleAvailable && fabric.sampleOptions.length > 0 && (
+              <div className="border border-[#e6e0d5] bg-[#faf8f5] rounded-xl p-4 text-xs space-y-2">
+                <span className="font-bold text-slate-800 block text-[10px] uppercase tracking-wider">
+                  Not sure yet?
+                </span>
+                <p className="text-slate-600 font-semibold leading-relaxed">
+                  Feel it before you buy in bulk. Test draping, colorfastness, and hand-feel.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {fabric.sampleOptions.map((opt) => (
+                    <span key={opt.id} className="inline-block bg-white border border-slate-200 px-2.5 py-1 rounded text-[10px] font-bold text-slate-700">
+                      {opt.name} · ₹{parseFloat(opt.price.toString()).toFixed(2)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* CTA Buttons */}
-            <div className="pt-4 flex flex-col gap-3">
+            <div className="pt-2 flex flex-col gap-3">
               {fabric.sampleAvailable && fabric.sampleOptions.length > 0 ? (
                 <Link
                   href={`/checkout/sample?fabricId=${fabric.id}`}
-                  className="w-full text-center py-3 text-sm font-semibold rounded-md bg-white border border-slate-900 text-slate-900 hover:bg-slate-50 transition-colors shadow-sm"
+                  className="w-full text-center py-3.5 text-xs font-bold uppercase tracking-wider rounded-md bg-white border border-slate-900 text-slate-900 hover:bg-slate-50 transition-colors shadow-sm"
                 >
                   ORDER PHYSICAL SAMPLE
                 </Link>
               ) : (
                 <button
                   disabled
-                  className="w-full text-center py-3 text-sm font-semibold rounded-md bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
+                  className="w-full text-center py-3.5 text-xs font-bold uppercase tracking-wider rounded-md bg-slate-100 border border-slate-200 text-slate-400 cursor-not-allowed"
                 >
                   SAMPLE NOT AVAILABLE
                 </button>
@@ -171,7 +190,7 @@ export default async function FabricDetailPage({ params }: FabricDetailPageProps
 
               <Link
                 href={`/buyer/quotes/new?fabricId=${fabric.id}`}
-                className="w-full text-center py-3 text-sm font-semibold rounded-md bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-1.5"
+                className="w-full text-center py-3.5 text-xs font-bold uppercase tracking-wider rounded-md bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-lg shadow-slate-900/10 flex items-center justify-center gap-1.5"
               >
                 <SendHorizontal className="h-4 w-4" /> REQUEST BULK QUOTE
               </Link>

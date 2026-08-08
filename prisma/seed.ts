@@ -218,27 +218,57 @@ async function main() {
   });
 
   // 5. Create Categories
-  const categoriesData = [
-    { name: "Cotton", slug: "cotton" },
-    { name: "Rayon", slug: "rayon" },
-    { name: "Polyester", slug: "polyester" },
-    { name: "Viscose", slug: "viscose" },
-    { name: "Linen", slug: "linen" },
-    { name: "Nylon", slug: "nylon" },
-    { name: "Georgette", slug: "georgette" },
-    { name: "Cambric", slug: "cambric" },
-    { name: "Lycra", slug: "lycra" },
-    { name: "BSY", slug: "bsy" },
-    { name: "Crepe", slug: "crepe" },
-    { name: "Satin", slug: "satin" },
+  const topCategories = [
+    { name: "GREY FABRIC", slug: "grey-fabric", description: "Raw, unfinished textile base materials directly from loom weaving.", image: "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80" },
+    { name: "FINISHED FABRIC", slug: "finished-fabric", description: "Processed, dyed, printed, and chemically treated apparel fabrics.", image: "https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=800&q=80" },
+    { name: "FINISHED FABRIC PRODUCTS", slug: "finished-fabric-products", description: "Ready-to-use stitched clothing, sarees, and premium home linen.", image: "https://images.unsplash.com/photo-1606041008023-472dfb5e530f?auto=format&fit=crop&w=800&q=80" },
   ];
 
   const categoriesMap: { [key: string]: any } = {};
-  for (const cat of categoriesData) {
+
+  for (const cat of topCategories) {
     const createdCat = await prisma.category.create({
       data: cat,
     });
     categoriesMap[cat.name] = createdCat;
+  }
+
+  // Create Subcategories under GREY FABRIC
+  const greySub = [
+    { name: "Grey Cotton", slug: "grey-cotton", parentId: categoriesMap["GREY FABRIC"].id },
+    { name: "Grey Synthetics", slug: "grey-synthetics", parentId: categoriesMap["GREY FABRIC"].id },
+    { name: "Grey Polyester", slug: "grey-polyester", parentId: categoriesMap["GREY FABRIC"].id },
+  ];
+  for (const cat of greySub) {
+    const created = await prisma.category.create({ data: cat });
+    categoriesMap[cat.name] = created;
+  }
+
+  // Create Subcategories under FINISHED FABRIC
+  const finishedSub = [
+    { name: "Rayon", slug: "rayon", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Satin", slug: "satin", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Lycra", slug: "lycra", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Cotton", slug: "cotton", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Cambric", slug: "cambric", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "BSY", slug: "bsy", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Georgette", slug: "georgette", parentId: categoriesMap["FINISHED FABRIC"].id },
+    { name: "Crepe", slug: "crepe", parentId: categoriesMap["FINISHED FABRIC"].id },
+  ];
+  for (const cat of finishedSub) {
+    const created = await prisma.category.create({ data: cat });
+    categoriesMap[cat.name] = created;
+  }
+
+  // Create Subcategories under FINISHED FABRIC PRODUCTS
+  const productSub = [
+    { name: "Clothing", slug: "clothing", parentId: categoriesMap["FINISHED FABRIC PRODUCTS"].id },
+    { name: "Home Textile", slug: "home-textile", parentId: categoriesMap["FINISHED FABRIC PRODUCTS"].id },
+    { name: "Other Products", slug: "other-products", parentId: categoriesMap["FINISHED FABRIC PRODUCTS"].id },
+  ];
+  for (const cat of productSub) {
+    const created = await prisma.category.create({ data: cat });
+    categoriesMap[cat.name] = created;
   }
 
   // 6. Create Fabrics

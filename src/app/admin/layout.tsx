@@ -2,7 +2,7 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import Link from "next/link";
-import { LayoutDashboard, Users, FileText, CheckSquare, CreditCard, ShieldAlert, FileClock } from "lucide-react";
+import { LayoutDashboard, Users, FileText, CheckSquare, CreditCard, ShieldAlert, FileClock, FolderTree } from "lucide-react";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -15,6 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const links = [
     { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
     { label: "Supplier Approvals", href: "/admin/suppliers", icon: Users },
+    { label: "Categories", href: "/admin/categories", icon: FolderTree },
     { label: "Fabric Moderation", href: "/admin/fabrics", icon: FileText },
     { label: "Payments Queue", href: "/admin/payments", icon: CreditCard },
     { label: "Bulk Orders", href: "/admin/orders", icon: CheckSquare },
